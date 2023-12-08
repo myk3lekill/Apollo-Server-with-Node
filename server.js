@@ -1,3 +1,8 @@
+const { ApolloServer } = require('@apollo/server')
+const { expressMiddleware } = require('@apollo/server/express4');
+const cors = require('cors');
+
+
 const express = require('express');
 const path = require('path');
 const { loadFilesSync } = require('@graphql-tools/load-files')
@@ -11,26 +16,36 @@ const resolversArray = loadFilesSync('**/*', {
   extensions: ['resolvers.js'],
 });
 
-const schema = makeExecutableSchema({
-  typeDefs: typesArray,
-  resolvers: resolversArray
-})
+async function startApolloServer() {
+  const app = express();
 
-const app = express();
+  const schema = makeExecutableSchema({
+    typeDefs: typesArray,
+    resolvers: resolversArray
+  });
 
-//Yoga
-const yoga = createYoga({
-  schema: schema,
-  context: (req) => ({ // Context factory gets called for every request
-      //myToken: req.headers.get('authorization') // I've commented this line because it was causing problems and it seems to work :)
-  }),
-  graphiql: true,
-})
+  const server = new ApolloServer({
+    schema: schema
+  });
 
-//MiddleWare
-app.use('/graphql', yoga)
-
-
-app.listen(3000, () => {
+  await server.start();
+  app.use(
+    '/graphql',
+    cors(),
+    express.json(),
+    expressMiddleware(server, {
+      context: async ({ req }) => ({ token: req.headers.token }),
+    }),
+  );
+  
+  app.listen(3000, () => {
     console.log('Running GraphQL server...')
-});
+  })
+
+}
+
+startApolloServer()
+
+
+
+
